@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "../../../../../src/common/tcp_profile.h"
 #include "worker/nixl/nixl_worker.h"
 #include <algorithm>
 #include <cassert>
@@ -935,6 +936,7 @@ xferBenchNixlWorker::ensureFileHasConsistencyData(const GusliDeviceConfig &devic
 /** Allocate and register memory descriptors for each thread. */
 std::vector<std::vector<xferBenchIOV>>
 xferBenchNixlWorker::allocateMemory(int num_threads) {
+    UCS_TP_SCOPE(UCS_TP_SETUP, this, num_threads);
     std::vector<std::vector<xferBenchIOV>> iov_lists;
     size_t i, buffer_size, num_devices = 0;
     nixl_opt_args_t opt_args;
@@ -1417,6 +1419,7 @@ prepareSlot(nixlAgent *agent,
             nixl_opt_args_t &params,
             xferBenchStats &thread_stats,
             slotState &slot) {
+    UCS_TP_SCOPE(UCS_TP_BENCH_PREPARE, &slot, 0);
     const bool reregister = xferBenchConfig::reregister_mem;
     const nixlTime::us_t prep_start = nixlTime::getUs();
 
@@ -1473,6 +1476,7 @@ prepareSlot(nixlAgent *agent,
 // in-flight; the caller drives completion via getXferStatus.
 static nixl_status_t
 postSlot(nixlAgent *agent, xferBenchStats &thread_stats, slotState &slot) {
+    UCS_TP_SCOPE(UCS_TP_BENCH_POST, slot.req, 0);
     const nixlTime::us_t post_start = nixlTime::getUs();
     nixl_status_t rc = agent->postXferReq(slot.req);
     if (rc != NIXL_SUCCESS && rc != NIXL_IN_PROG) {
@@ -1488,6 +1492,7 @@ postSlot(nixlAgent *agent, xferBenchStats &thread_stats, slotState &slot) {
 // next prepareSlot exercises the full lifecycle.
 static nixl_status_t
 recycleSlot(nixlAgent *agent, nixlBackendH *backend_engine, slotState &slot) {
+    UCS_TP_SCOPE(UCS_TP_BENCH_RECYCLE, slot.req, 0);
     if (slot.req) {
         agent->releaseXferReq(slot.req);
         slot.req = nullptr;
@@ -1623,6 +1628,7 @@ execTransferLoop(nixlAgent *agent,
                 return -1;
             }
 
+            UCS_TP_MARK(UCS_TP_BENCH_DONE, slots[s].req, completed, s);
             completed++;
             thread_stats.transfer_duration.add(nixlTime::getUs() - slots[s].post_ts);
             slots[s].in_flight = false;
@@ -1678,6 +1684,7 @@ execTransfer(nixlAgent *agent,
              const int num_threads,
              xferBenchStats &stats,
              const std::atomic<int> *terminate_ptr = nullptr) {
+    UCS_TP_SCOPE(UCS_TP_BENCH_CASE, agent, num_iter);
     int ret = 0;
     stats.clear();
 
@@ -1781,6 +1788,7 @@ xferBenchNixlWorker::transfer(size_t block_size,
 
 void
 xferBenchNixlWorker::poll(size_t block_size) {
+    UCS_TP_SCOPE(UCS_TP_TARGET_POLL, this, block_size);
     nixl_notifs_t notifs;
     nixl_status_t status;
     int skip = 0, num_iter = 0, total_iter = 0;

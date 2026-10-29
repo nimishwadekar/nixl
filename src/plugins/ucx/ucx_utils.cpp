@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "../../common/tcp_profile.h"
 #include "ucx_utils.h"
 
 #include <algorithm>
@@ -267,6 +268,7 @@ nixlUcxEp::read(uint64_t raddr,
                 nixlUcxMem &mem,
                 size_t size,
                 nixlUcxReq &req) {
+    UCS_TP_SCOPE(UCS_TP_UCP_GET, this, size);
     nixl_status_t status = checkTxState();
     if (status != NIXL_SUCCESS) [[unlikely]] {
         return status;
@@ -340,6 +342,7 @@ nixlUcxEp::estimateCost(size_t size,
 
 nixl_status_t
 nixlUcxEp::flushEp(nixlUcxReq &req) {
+    UCS_TP_SCOPE(UCS_TP_FLUSH, this, 0);
     ucp_request_param_t param;
     ucs_status_ptr_t request;
 
@@ -674,6 +677,7 @@ nixlUcxWorker::progress() {
 
 void
 nixlUcxWorker::progressLoop() {
+    UCS_TP_SCOPE(UCS_TP_WORKER_PROGRESS, this, 0);
     while (progress() != 0)
         ;
 }

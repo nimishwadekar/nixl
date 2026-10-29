@@ -73,6 +73,12 @@ endif
 
 # set up some global vars for compiler, platform, configuration, etc.
 cpp = meson.get_compiler('cpp')
+if get_option('tcp_profile')
+    add_project_arguments('-DUCS_TCP_PROFILE_ENABLED=1',
+        '-I' + get_option('ucx_path') + '/include', language: 'cpp')
+    add_project_link_arguments('-L' + get_option('ucx_path') + '/lib',
+        '-lucs', language: 'cpp')
+endif
 fs = import('fs')
 
 dl_dep = cpp.find_library('dl', required: true)

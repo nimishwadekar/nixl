@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "../../../src/common/tcp_profile.h"
 #include "config.h"
 #include <iostream>
 #include <nixl.h>
@@ -181,6 +182,19 @@ createWorker() {
 } // namespace
 
 int main(int argc, char *argv[]) {
+#if UCS_TCP_PROFILE_ENABLED
+    if (ucs_tcp_profile_init() != 0) {
+        std::cerr << "TCP profile initialization failed" << std::endl;
+        return EXIT_FAILURE;
+    }
+    auto tcp_profile_guard = make_scope_guard([] {
+        ucs_tcp_profile_stop();
+        const char *path = std::getenv("NIXL_TCP_PROFILE_FILE");
+        if (ucs_tcp_profile_dump(path ? path : "/tmp/nixl-tcp-profile.bin") != 0) {
+            std::cerr << "TCP profile dump failed" << std::endl;
+        }
+    });
+#endif
     int ret = xferBenchConfig::parseConfig(argc, argv);
     if (0 != ret) {
         return EXIT_FAILURE;

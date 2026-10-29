@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "../common/tcp_profile.h"
 #include <iostream>
 #include <chrono>
 #include <iostream>
@@ -740,6 +741,7 @@ nixlAgent::makeXferReq (const nixl_xfer_op_t &operation,
                         const std::vector<int> &remote_indices,
                         nixlXferReqH* &req_hndl,
                         const nixl_opt_args_t* extra_params) const {
+    UCS_TP_SCOPE(UCS_TP_NIXL_MAKE, local_side, 0);
     NIXL_TRACE_SCOPE(
         trace_span, data->tracer_.get(), "nixl::makeXferReq", nixl::trace::Kind::Generic);
     NIXL_TRACE_ATTR(trace_span, "desc_count", static_cast<std::int64_t>(local_indices.size()));
@@ -932,6 +934,7 @@ nixlAgent::createXferReq(const nixl_xfer_op_t &operation,
                          const std::string &remote_agent,
                          nixlXferReqH* &req_hndl,
                          const nixl_opt_args_t* extra_params) const {
+    UCS_TP_SCOPE(UCS_TP_NIXL_CREATE, &local_descs, 0);
     NIXL_TRACE_SCOPE(
         trace_span, data->tracer_.get(), "nixl::createXferReq", nixl::trace::Kind::Generic);
     NIXL_TRACE_ATTR(trace_span, "remote_agent", std::string_view{remote_agent});
@@ -1118,6 +1121,7 @@ nixlAgent::estimateXferCost(const nixlXferReqH *req_hndl,
 nixl_status_t
 nixlAgent::postXferReq(nixlXferReqH *req_hndl,
                        const nixl_opt_args_t* extra_params) const {
+    UCS_TP_SCOPE(UCS_TP_NIXL_POST, req_hndl, 0);
     nixl_opt_b_args_t opt_args;
 
     opt_args.hasNotif = false;
@@ -1145,7 +1149,15 @@ nixlAgent::postXferReq(nixlXferReqH *req_hndl,
         req_hndl->timer.restart();
     }
 
+#if UCS_TCP_PROFILE_ENABLED
+    std::shared_lock<nixlLock> read_lock(data->lock, std::defer_lock);
+    {
+        UCS_TP_SCOPE(UCS_TP_NIXL_LOCK_WAIT, &data->lock, 0);
+        read_lock.lock();
+    }
+#else
     std::shared_lock<nixlLock> read_lock(data->lock);
+#endif
     // Check if the remote was invalidated before post/repost
     const auto sec_it = data->remoteSections_.find(req_hndl->remoteAgent);
     if (sec_it == data->remoteSections_.end()) {
@@ -1254,8 +1266,17 @@ nixlAgent::postXferReq(nixlXferReqH *req_hndl,
 
 nixl_status_t
 nixlAgent::getXferStatus (nixlXferReqH *req_hndl) const {
+    UCS_TP_SCOPE(UCS_TP_NIXL_STATUS, req_hndl, 0);
 
+#if UCS_TCP_PROFILE_ENABLED
+    std::shared_lock<nixlLock> read_lock(data->lock, std::defer_lock);
+    {
+        UCS_TP_SCOPE(UCS_TP_NIXL_LOCK_WAIT, &data->lock, 0);
+        read_lock.lock();
+    }
+#else
     std::shared_lock<nixlLock> read_lock(data->lock);
+#endif
     // If the status is done, no need to recheck and no state changes.
     // Same for users incorrectly recalling this method in error/done.
     if (req_hndl->status == NIXL_IN_PROG) {
@@ -1324,6 +1345,7 @@ nixlAgent::queryXferBackend(const nixlXferReqH* req_hndl,
 
 nixl_status_t
 nixlAgent::releaseXferReq(nixlXferReqH *req_hndl) const {
+    UCS_TP_SCOPE(UCS_TP_NIXL_RELEASE, req_hndl, 0);
 
     NIXL_SHARED_LOCK_GUARD(data->lock);
     //attempt to cancel request
@@ -1361,6 +1383,7 @@ nixlAgent::releasedDlistH (nixlDlistH* dlist_hndl) const {
 nixl_status_t
 nixlAgent::getNotifs(nixl_notifs_t &notif_map,
                      const nixl_opt_args_t* extra_params) {
+    UCS_TP_SCOPE(UCS_TP_NIXL_NOTIFS, this, 0);
     NIXL_TRACE_SCOPE(
         trace_span, data->tracer_.get(), "nixl::getNotifs", nixl::trace::Kind::Metadata);
 

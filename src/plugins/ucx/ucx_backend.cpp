@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "../../common/tcp_profile.h"
 #include "ucx_backend.h"
 #include "common/nixl_log.h"
 #include "serdes/serdes.h"
@@ -132,6 +133,7 @@ public:
 
     [[nodiscard]] virtual nixl_status_t
     status() {
+        UCS_TP_SCOPE(UCS_TP_BACKEND_STATUS, this, requests_.size());
         if (requests_.empty()) {
             /* No pending transmissions */
             connections_.clear();
@@ -714,6 +716,7 @@ nixlUcxThreadPoolEngine::sendXferRange(const nixl_xfer_op_t &operation,
 
     for (size_t i = 0; i < comp_handle->getNumChunks(); i++) {
         io_->post([&, i]() {
+            UCS_TP_SCOPE(UCS_TP_POOL_TASK, comp_handle, i);
             nixlUcxDedicatedThread *thread = nixlUcxDedicatedThread::getDedicatedThread();
             NIXL_ASSERT(thread != nullptr);
 
@@ -739,7 +742,10 @@ nixlUcxThreadPoolEngine::sendXferRange(const nixl_xfer_op_t &operation,
         });
     }
 
-    future.wait();
+    {
+        UCS_TP_SCOPE(UCS_TP_POOL_WAIT, comp_handle, 0);
+        future.wait();
+    }
     NIXL_TRACE << "sent " << *comp_handle << " with status: " << status.load();
     return status.load();
 }
@@ -1045,6 +1051,7 @@ nixl_status_t nixlUcxEngine::prepXfer (const nixl_xfer_op_t &operation,
                                        nixlBackendReqH* &handle,
                                        const nixl_opt_b_args_t* opt_args) const
 {
+    UCS_TP_SCOPE(UCS_TP_BACKEND_PREP, this, local.descCount());
     if (local.descCount() == 0 || remote.descCount() == 0) {
         NIXL_ERROR << "Local or remote descriptor list is empty";
         return NIXL_ERR_INVALID_PARAM;
@@ -1122,6 +1129,7 @@ nixlUcxEngine::sendXferRangeBatch(nixlUcxEp &ep,
                                   size_t worker_id,
                                   size_t start_idx,
                                   size_t end_idx) {
+    UCS_TP_SCOPE(UCS_TP_BACKEND_BATCH, &ep, end_idx-start_idx);
     batchResult result = {NIXL_SUCCESS, 0, nullptr};
 
     for (size_t i = start_idx; i < end_idx; ++i) {
@@ -1223,6 +1231,7 @@ nixlUcxEngine::postXfer(const nixl_xfer_op_t &operation,
                         const std::string &remote_agent,
                         nixlBackendReqH *&handle,
                         const nixl_opt_b_args_t *opt_args) const {
+    UCS_TP_SCOPE(UCS_TP_BACKEND_POST, handle, local.descCount());
     const size_t lcnt = local.descCount();
     const size_t rcnt = remote.descCount();
     const auto int_handle = static_cast<nixlUcxBackendReqH *>(handle);
@@ -1265,6 +1274,7 @@ nixlUcxEngine::postXfer(const nixl_xfer_op_t &operation,
 
 nixl_status_t nixlUcxEngine::checkXfer (nixlBackendReqH* handle) const
 {
+    UCS_TP_SCOPE(UCS_TP_BACKEND_CHECK, handle, 0);
     const auto int_handle = static_cast<nixlUcxBackendReqH *>(handle);
     const nixl_status_t handle_status = int_handle->status();
 
@@ -1332,6 +1342,7 @@ nixlUcxEngine::notifSendPriv(const std::string &remote_agent,
                              const std::string &msg,
                              const std::unique_ptr<nixlUcxEp> &ep,
                              nixlUcxReq *req) const {
+    UCS_TP_SCOPE(UCS_TP_NOTIF_SEND, ep.get(), msg.size());
     nixlSerDes ser_des;
 
     ser_des.addStr("name", localAgent);
@@ -1375,6 +1386,7 @@ nixlUcxEngine::notifAmCb(void *arg, const void *header,
                          size_t length,
                          const ucp_am_recv_param_t *param)
 {
+    UCS_TP_SCOPE(UCS_TP_NOTIF_RECEIVE, arg, length);
     nixlSerDes ser_des;
 
     std::string ser_str( (char*) data, length);
@@ -1394,6 +1406,7 @@ nixlUcxEngine::notifAmCb(void *arg, const void *header,
 
 nixl_status_t
 nixlUcxEngine::getNotifs(notif_list_t &notif_list) {
+    UCS_TP_SCOPE(UCS_TP_NOTIF_RETRIEVE, this, 0);
     if (!notif_list.empty()) {
         return NIXL_ERR_INVALID_PARAM;
     }
