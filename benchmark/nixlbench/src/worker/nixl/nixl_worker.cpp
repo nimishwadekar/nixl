@@ -1693,6 +1693,7 @@ execTransfer(nixlAgent *agent,
     {
         xferBenchStats thread_stats;
         thread_stats.reserve(num_iter);
+        UCS_TP_MARK(UCS_TP_THREAD_ROLE, agent, 3, 0);
         const int tid = omp_get_thread_num();
         const auto &local_iov = local_iovs[tid];
         const auto &remote_iov = remote_iovs[tid];
@@ -1764,6 +1765,7 @@ xferBenchNixlWorker::transfer(size_t block_size,
         }
     }
 
+    UCS_TP_MEASURE_BEGIN();
     // Synchronize to ensure all processes have completed the warmup (iter and polling)
     synchronize();
 
@@ -1782,6 +1784,7 @@ xferBenchNixlWorker::transfer(size_t block_size,
         return std::variant<xferBenchStats, int>(ret);
     }
 
+    UCS_TP_MEASURE_END();
     synchronize();
     return std::variant<xferBenchStats, int>(stats);
 }
@@ -1789,6 +1792,7 @@ xferBenchNixlWorker::transfer(size_t block_size,
 void
 xferBenchNixlWorker::poll(size_t block_size) {
     UCS_TP_SCOPE(UCS_TP_TARGET_POLL, this, block_size);
+    UCS_TP_MARK(UCS_TP_THREAD_ROLE, this, 4, 0);
     nixl_notifs_t notifs;
     nixl_status_t status;
     int skip = 0, num_iter = 0, total_iter = 0;
@@ -1824,6 +1828,7 @@ xferBenchNixlWorker::poll(size_t block_size) {
         status = agent->getNotifs(notifs);
         checkLiveness();
     } while (!signaled() && status == NIXL_SUCCESS && skip != int(notifs["initiator"].size()));
+    UCS_TP_MEASURE_BEGIN();
     synchronize();
 
     /* Polling for actual iterations*/
@@ -1832,6 +1837,7 @@ xferBenchNixlWorker::poll(size_t block_size) {
         checkLiveness();
     } while (!signaled() && status == NIXL_SUCCESS &&
              total_iter != int(notifs["initiator"].size()));
+    UCS_TP_MEASURE_END();
     synchronize();
 }
 

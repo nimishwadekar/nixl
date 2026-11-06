@@ -5,4 +5,6 @@
 #else
 #define UCS_TP_SCOPE(_event, _object, _a) do { } while (0)
 #define UCS_TP_MARK(_event, _object, _a, _b) do { } while (0)
+#define UCS_TP_MEASURE_BEGIN() do { } while (0)
+#define UCS_TP_MEASURE_END() do { } while (0)
 #endif

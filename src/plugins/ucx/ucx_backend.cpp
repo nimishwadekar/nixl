@@ -314,6 +314,7 @@ public:
 protected:
     void
     run() override {
+        UCS_TP_MARK(UCS_TP_THREAD_ROLE, this, 1, 0);
         NIXL_DEBUG << "shared " << *this << " running";
         // Set timeout event so that the main loop would progress all workers on first iteration
         bool timeout = true;
@@ -596,6 +597,7 @@ protected:
     void
     run() override {
         const auto guard = asio::make_work_guard(io_);
+        UCS_TP_MARK(UCS_TP_THREAD_ROLE, this, 2, 0);
         NIXL_DEBUG << "dedicated " << *this << " running";
 
         while (!io_.stopped()) {
@@ -675,6 +677,7 @@ nixlUcxThreadPoolEngine::prepXfer(const nixl_xfer_op_t &operation,
                                   nixlBackendReqH *&handle,
                                   const nixl_opt_b_args_t *opt_args) const {
     size_t batch_size = local.descCount();
+    UCS_TP_MARK(UCS_TP_BACKEND_LAYOUT, this, batch_size, dedicatedThreads_.size());
     if (batch_size < splitBatchSize_) {
         return nixlUcxEngine::prepXfer(operation, local, remote, remote_agent, handle, opt_args);
     }
@@ -682,6 +685,7 @@ nixlUcxThreadPoolEngine::prepXfer(const nixl_xfer_op_t &operation,
     size_t chunk_size = std::max(batch_size / dedicatedThreads_.size(), splitBatchSize_);
     size_t num_chunks = (batch_size + chunk_size - 1) / chunk_size;
 
+    UCS_TP_MARK(UCS_TP_POOL_LAYOUT, this, batch_size, num_chunks);
     size_t worker_id = getSharedWorkerId();
     const auto comp_handle = new nixlUcxCompositeBackendReqH(
         getSharedWorker(worker_id).get(), worker_id, chunk_size, num_chunks);
@@ -1057,6 +1061,7 @@ nixl_status_t nixlUcxEngine::prepXfer (const nixl_xfer_op_t &operation,
         return NIXL_ERR_INVALID_PARAM;
     }
 
+    UCS_TP_MARK(UCS_TP_BACKEND_LAYOUT, this, local.descCount(), 0);
     const size_t worker_id = getSharedWorkerId(opt_args);
     /* TODO: try to get from a pool first */
     handle = new nixlUcxBackendReqH(getSharedWorker(worker_id).get(), worker_id);
